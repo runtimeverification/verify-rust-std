@@ -35,19 +35,33 @@ KMIR is released under an OSI-approved open source license. It is distributed un
 
 ## Steps to Use the Tool
 
-**TODO: These steps are more goals than a reality right now**
+At RV, we generally strives to use [kup](https://github.com/runtimeverification/kup) , a `nix`-based software installer, to distribute our software.
+This is future work, at the moment `kmir` requires a local build from source using the `K Framework` (installed with `kup`).
+
+The future workflow we imagine is to
 1. Download [kup](https://github.com/runtimeverification/kup) and install
 2. Install KMIR `kup install kmir`
-3. Compile the desired verification target with `kmir build target.rs`
-4. Verify the target with `kmir prove target.rs`
-5. Inspect KCFG of proof with `kmir view target.rs`
+3. Compile the desired verification target with `kmir build module.rs`
+   The `module.rs` should contain functions that act as property tests and are run with symbolic inputs.
+4. Verify the target with `kmir prove module.rs --target target_function`
+   This executes `target_function` with symbolic arguments. The test is expected to contain assertions about computed values.
+5. Inspect KCFG of proof with `kmir view module::target_function`
+
+At the time of writing, step 3 requires manual work to set up a _claim_ in the K language.
+We will automate this process in the frontend code to avoid the user having to write K code.
 
 ## Artifacts & Audit Mechanisms
+
+**TODO add papers about Matching Logic and about K framework**  
+**TODO add links https://kontrol.runtimeverification.com and to the `evm-semantics` repository as examples of K framework integration.**  
+**TODO craft 1-2 more examples of proofs we can already do. `unchecked_xyz` function challenge 11?**  
+
 _If there are noteworthy examples of using the tool to perform verification, please include them in this section. Links, papers, etc._
 _Also include mechanisms for the committee to audit the implementation and correctness of this tool (e.g., regression tests)._
 
 ## Versioning
-KMIR and Stable MIR JSON are both versioned using git, and depend on intermittent updates to nightly Rust.
+KMIR and Stable MIR JSON are both developed using git, and will have semantic version numbers as soon as releases are made.
+Stable MIR JSON depends on a nightly Rust compiler of a particular version (which is regularly updated, currently `nightly-2024-11-29`).
 
 ## CI
 _If your tool is approved, you will be responsible merging a workflow into this repository that runs your tool against the standard library. For an example, see the Kani workflow (.github/workflows/kani.yml). Describe, at a high level, how your workflow will operate. (E.g., how will you package the tool to run in CI, how will you identify which proofs to run?)._
