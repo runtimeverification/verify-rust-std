@@ -4,7 +4,7 @@ _The following form is designed to provide information for your tool that should
 **KMIR**
 
 ## Description
-[KMIR](https://github.com/runtimeverification/mir-semantics) is a formal verification tool for Rust that defines the operational semantics of Rust’s Middle Intermediate Representation (MIR) in K (through Stable MIR). By leveraging the [K framework](https://kframework.org/), KMIR provides a parser, interpreter, and symbolic execution engine for MIR programs. This tool enables direct execution of concrete and symbolic input, with step-by-step inspection of the internal state of the MIR program's execution, serving as a foundational step toward full formal verification of Rust programs. Through the dependency [Stable MIR JSON](https://github.com/runtimeverification/stable-mir-json/) KMIR allows developers to extract serialised Stable MIR from Rust’s compilation process, execute it, and eventually prove critical properties of their code. It is available via our package manager, [kup](https://github.com/runtimeverification/kup), making it easily installable and integrable into various workflows.
+[KMIR](https://github.com/runtimeverification/mir-semantics) is a formal verification tool for Rust that defines the operational semantics of Rust’s Middle Intermediate Representation (MIR) in K (through Stable MIR). By leveraging the [K framework](https://kframework.org/), KMIR provides a parser, interpreter, and symbolic execution engine for MIR programs. This tool enables direct execution of concrete and symbolic input, with step-by-step inspection of the internal state of the MIR program's execution, serving as a foundational step toward full formal verification of Rust programs. Through the dependency [Stable MIR JSON](https://github.com/runtimeverification/stable-mir-json/) KMIR allows developers to extract serialised Stable MIR from Rust’s compilation process, execute it, and eventually prove critical properties of their code. Soon KMIR will be available via our package manager, [kup](https://github.com/runtimeverification/kup), making it easily installable and integrable into various workflows.
 
 This diagram describes extraction and verification workflow for KMIR:
 **TODO**: Paste the image into the issue https://drive.google.com/file/d/1KNftl47__f1dWWUWwrhzbWhNwQHfhwxh/view?usp=sharing
@@ -17,11 +17,17 @@ KMIR also prioritises UI with interactive proof exploration available out-of-the
 ## Tool Information
 
 * [x] Does the tool perform Rust verification? 
+  *Yes – It performs verification at the MIR level, which is a critical intermediate representation of Rust programs.*
 * [x] Does the tool deal with *unsafe* Rust code? 
+  *Yes – By operating on MIR, KMIR can analyze both safe and unsafe Rust code.*
 * [x] Does the tool run independently in CI? 
+  *Yes – KMIR can be integrated into CI workflows via our package manager and Nix-based build system.*
 * [x] Is the tool open source?
+  *Yes – KMIR is open source and available on GitHub.*
 * [x] Is the tool under development? 
+  *Yes – KMIR is actively under development, with ongoing improvements to MIR syntax coverage and verification capabilities.*
 * [x] Will you or your team be able to provide support for the tool?
+  *Yes – The Runtime Verification team is committed to supporting KMIR and will provide ongoing maintenance and community support.*
 
 ## Comparison to Other Approved Tools
 The other tools approved at the time of writing at Kani, Verifast, and Goto-transcoder (ESBMC).
