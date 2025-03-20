@@ -58,8 +58,18 @@ We will automate this process in the frontend code to avoid the user having to w
 
 ## Artifacts & Audit Mechanisms
 
-**TODO add papers about Matching Logic and about K framework**  
-**TODO add links https://kontrol.runtimeverification.com and to the `evm-semantics` repository as examples of K framework integration.**  
+- **[Matching Logic](http://www.matching-logic.org/)**  
+  Matching Logic is a foundational logic underpinning the K framework, providing a unified approach to specifying, verifying, and reasoning about programming languages and their properties in a correct-by-construction manner.
+
+- **[K Framework](https://kframework.org/)**  
+  The K Framework is a rewrite-based executable semantic framework designed for defining programming languages, type systems, and formal analysis tools. It automatically generates language analysis tools directly from their formal semantics.
+
+- **[Kontrol](https://kontrol.runtimeverification.com)**  
+  Kontrol is a formal verification tool built on K's semantics, enabling symbolic execution and proof construction for Ethereum smart contracts.
+
+- **[KEVM Semantics](https://github.com/kframework/evm-semantics)**  
+  KEVM provides a practical, executable formal specification of the Ethereum Virtual Machine using the K Framework, demonstrating K’s real-world application for verifying blockchain virtual machines.
+
 **TODO craft 1-2 more examples of proofs we can already do. `unchecked_xyz` function challenge 11?**  
 
 _If there are noteworthy examples of using the tool to perform verification, please include them in this section. Links, papers, etc._
