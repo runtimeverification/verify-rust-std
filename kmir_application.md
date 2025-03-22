@@ -13,8 +13,10 @@ This diagram describes the extraction and verification workflow for KMIR:
 
 Particular to this challenge, KMIR verifies program correctness using the correct-by-construction symbolic execution engine and verifier derived from the K encoding of the Stable MIR semantics. The K semantics framework is based on reachability logic, which is a theory describing transition systems in [matching logic](http://www.matching-logic.org/). Transition rules of the semantics are rewriting steps that match patterns and transform the current continuation and state accordingly. An all-path-reachability proof in this system verifies that a particular _target_ end state is _always_ reachable from a given starting state. The rewrite rules branch on symbolic inputs covering the possible transitions, creating a model that is provably complete, and requiring unification on every leaf state. A one-path-reachability proof is similar to the above, but the proof requirement is that at least one leaf state unifies with the target state. One feature of such a system is that the requirement for an SMT is minimized to determining completeness on path conditions when branching would occur.
 
-KMIR also prioritizes UI with interactive proof exploration available out-of-the-box through the terminal KCFG (K Control Flow Graph) viewer, allowing users to inspect intermediate states of the proof to get feedback on the successful path conditions and failing at unifying with the target state.
-**TODO** Show diagram of Jost's max KCFG https://github.com/runtimeverification/mir-semantics/tree/tmp/example-proof/scratch/maximum-proof
+KMIR also prioritizes UI with interactive proof exploration available out-of-the-box through the terminal KCFG (K Control Flow Graph) viewer, allowing users to inspect intermediate states of the proof to get feedback on the successful path conditions and failing at unifying with the target state. An example of a KMIR proof being analyzed using the KCFG viewer can be seen below:
+
+<img width="1231" alt="image" src="https://github.com/user-attachments/assets/a9f86957-7ea5-4bf6-bee2-202487aacc9b" />
+
 
 ## Tool Information
 
@@ -34,7 +36,7 @@ KMIR also prioritizes UI with interactive proof exploration available out-of-the
 ## Comparison to Other Approved Tools
 The other tools approved at the time of writing at Kani, Verifast, and Goto-transcoder (ESBMC).
 
-- **Verification Backend:** KMIR is primarily different from all of these tools by utilizing a unique verification backend through the K framework and reachability logic (as explained in the description above). KMIR has little dependence on an SAT solver or SMT solver. Kani's CBMC backend and Goto-transcode (ESBMC) encode the verification problem into an SAT / SMT verification condition to be discharged by the appropriate solver. Kani recently has added a Lean backend through Aeneas, however Lean does not support matching or reachability logic currently, **TODO: CHECK (Not sure if true or worth mentioning)** and full automation of these proofs may not be possible yet. Verifast performs symbollic execution of the verification target like KMIR, however reasoning is performed by annotating functions with design-by-contract components in separation logic.
+- **Verification Backend:** KMIR primarily differs from all of these tools by utilizing a unique verification backend through the K framework and reachability logic (as explained in the description above). KMIR has little dependence on an SAT solver or SMT solver. Kani's CBMC backend and Goto-transcode (ESBMC) encode the verification problem into an SAT / SMT verification condition to be discharged by the appropriate solver. Kani recently added a Lean backend through Aeneas, however Lean does not support matching or reachability logic currently. Verifast performs symbollic execution of the verification target like KMIR, however reasoning is performed by annotating functions with design-by-contract components in separation logic.
 - **Verification Input:** KMIR takes input from Stable MIR JSON, an effort to serialize the internal MIR in a portable way that can be reusable by other projects.
 - **K Ecosystem:** Since all tools in the K ecosystem share a common foundation of K, all projects benefit from development done by other K projects. This means that performance and user experience are projected to improve due to the continued development of other semantics. 
 
@@ -58,7 +60,7 @@ The future workflow we imagine is to
 At the time of writing, step 3 requires manual work to set up a _claim_ in the K language.
 We will automate this process in the frontend code to prevent the user from having to write K code.
 
-To see the specifications and run proofs using KMIR, including a subsection of the proofs required in the [Safety of Methods for Numeric Primitive Types](https://model-checking.github.io/verify-rust-std/challenges/0011-floats-ints.html#challenge-11-safety-of-methods-for-numeric-primitive-types) challenges, check this [instructional document](https://github.com/runtimeverification/mir-semantics/blob/sample-challenge-11-proofs/rust-verification-proofs/README.md) in our tool's repository.
+**To see the specifications and run proofs using KMIR, including a subsection of the proofs required in the [Safety of Methods for Numeric Primitive Types](https://model-checking.github.io/verify-rust-std/challenges/0011-floats-ints.html#challenge-11-safety-of-methods-for-numeric-primitive-types) challenges, check this [instructional document](https://github.com/runtimeverification/mir-semantics/blob/sample-challenge-11-proofs/rust-verification-proofs/README.md) in our tool's repository.**
 
 ## Artifacts & Audit Mechanisms
 
