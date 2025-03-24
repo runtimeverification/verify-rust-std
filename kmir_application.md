@@ -2,7 +2,7 @@
 **KMIR**
 
 ## Description
-[KMIR](https://github.com/runtimeverification/mir-semantics) is a formal verification tool for Rust that defines the operational semantics of Rust’s Middle Intermediate Representation (MIR) in K (through Stable MIR). By leveraging the [K framework](https://kframework.org/), KMIR provides a parser, interpreter, and symbolic execution engine for MIR programs. This tool enables direct execution of concrete and symbolic input, with step-by-step inspection of the internal state of the MIR program's execution, serving as a foundational step toward full formal verification of Rust programs. Through the dependency [Stable MIR JSON](https://github.com/runtimeverification/stable-mir-json/), KMIR allows developers to extract serialized Stable MIR from Rust’s compilation process, execute it, and eventually prove critical properties of their code. Soon, KMIR will be available via our package manager, [kup](https://github.com/runtimeverification/kup), which will make it easily installable and integrable into various workflows.
+[KMIR](https://github.com/runtimeverification/mir-semantics) is a formal verification tool for Rust that defines the operational semantics of Rust's Middle Intermediate Representation (MIR) in K (through Stable MIR). By leveraging the [K framework](https://kframework.org/), KMIR provides a parser, interpreter, and symbolic execution engine for MIR programs. This tool enables direct execution of concrete and symbolic input, with step-by-step inspection of the internal state of the MIR program's execution, serving as a foundational step toward full formal verification of Rust programs. Through the dependency [Stable MIR JSON](https://github.com/runtimeverification/stable-mir-json/), KMIR allows developers to extract serialized Stable MIR from Rust's compilation process, execute it, and eventually prove critical properties of their code. Soon, KMIR will be available via our package manager, [kup](https://github.com/runtimeverification/kup), which will make it easily installable and integrable into various workflows.
 
 This diagram describes the extraction and verification workflow for KMIR:
 
@@ -72,11 +72,44 @@ We will automate this process in the frontend code to prevent the user from havi
   Kontrol is a formal verification tool built on K's semantics, enabling symbolic execution and proof construction for Ethereum smart contracts.
 
 - **[KEVM Semantics](https://github.com/kframework/evm-semantics)**  
-  KEVM provides a practical, executable formal specification of the Ethereum Virtual Machine using the K Framework, demonstrating K’s real-world application for verifying blockchain virtual machines.
+  KEVM provides a practical, executable formal specification of the Ethereum Virtual Machine using the K Framework, demonstrating K's real-world application for verifying blockchain virtual machines.
 
 ## Versioning
-KMIR and Stable MIR JSON are both developed using git, and will have semantic version numbers as soon as releases are made.
+KMIR and Stable MIR JSON are both version controlled using git and hosted by Github. Semantic version numbers are used as soon as releases are made.
 Stable MIR JSON depends on a nightly Rust compiler of a particular version (which is regularly updated, currently `nightly-2024-11-29`).
+Dependencies for K and MIR JSON are tracked as pinned versions in the 'deps' folder and updated as changes are published upstream and tested against mir-semantics.
 
 ## CI
-_If your tool is approved, you will be responsible merging a workflow into this repository that runs your tool against the standard library. For an example, see the Kani workflow (.github/workflows/kani.yml). Describe, at a high level, how your workflow will operate. (E.g., how will you package the tool to run in CI, how will you identify which proofs to run?)._
+At Runtime Verification, we are regularly releasing and updating our tools using GitHub Actions and publishing our updated tool releases to standardized locations such as [Dockerhub](https://hub.docker.com/u/runtimeverificationinc) / ghcr.io / [cachix](https://app.cachix.org/cache/k-framework-binary). Any changes upstream to [K](https://github.com/runtimeverification/k) or [stable-mir-json](https://github.com/runtimeverification/stable-mir-json/tree/fbdfe361d79a7d125d4ff70fb7c7b354eee483ee) are immediately propagated to mir-semantics via workflow triggers to ensure the latest release of the tool is getting the latest improvements from K. 
+
+For integrating KMIR into your project's CI pipeline, we recommend using our pre-built packages. You can choose from several installation methods depending on your needs:
+
+Our current Registries / Caches are:
+1. [Binary Cachix cache used by Kup](https://app.cachix.org/cache/k-framework-binary)
+2. [Source code on GitHub](https://github.com/runtimeverification/mir-semantics)
+3. [Container image on Dockerhub](https://hub.docker.com/u/runtimeverificationinc)
+
+A simple Workflow Example using a docker image may look as follows: 
+```yaml
+name: Test w/ KMIR
+on:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: runtimeverification/mir-semantics:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load latest SMIR Json
+        run: |
+          kmir run
+      - name: Create a K Specification
+        run: |
+          kmir gen-spec
+      - name: Prove
+        run: |
+          kmir prove 
+```
+
+**Note: The actual workflow may differ based on your specific needs and layout of the project files.**
