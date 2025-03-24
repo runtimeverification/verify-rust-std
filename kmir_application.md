@@ -39,7 +39,7 @@ The other tools approved at the time of writing at Kani, Verifast, and Goto-tran
 - **K Ecosystem:** Since all tools in the K ecosystem share a common foundation of K, all projects benefit from development done by other K projects. This means that performance and user experience are projected to improve due to the continued development of other semantics. 
 
 ## Licenses
-KMIR is released under an OSI-approved open source license. It is distributed under the BSD-3 clause license, which is compatible with the Rust standard library licenses. Please refer to the KMIR GitHub repository for full license details.
+KMIR is released under an OSI-approved open source license. It is distributed under the BSD-3 clause license, which is compatible with the Rust standard library licenses. Please refer to the [KMIR GitHub repository](https://github.com/runtimeverification/mir-semantics?tab=BSD-3-Clause-1-ov-file) for full license details.
 
 ## Steps to Use the Tool
 
