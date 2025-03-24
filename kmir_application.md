@@ -72,7 +72,7 @@ We will automate this process in the frontend code to prevent the user from havi
   Kontrol is a formal verification tool built on K's semantics, enabling symbolic execution and proof construction for Ethereum smart contracts.
 
 - **[KEVM Semantics](https://github.com/kframework/evm-semantics)**  
-  KEVM provides a practical, executable formal specification of the Ethereum Virtual Machine using the K Framework, demonstrating K's real-world application for verifying blockchain virtual machines.
+KEVM provides a practical, executable formal specification of the Ethereum Virtual Machine using the K Framework, demonstrating K’s real-world application for verifying blockchain virtual machines.
 
 ## Versioning
 KMIR and Stable MIR JSON are both version controlled using git and hosted by Github. Semantic version numbers are used as soon as releases are made.
