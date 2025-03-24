@@ -1,5 +1,3 @@
-_The following form is designed to provide information for your tool that should be included in the effort to verify the Rust standard library. Please note that the tool will need to be **supported** if it is to be included._
-
 ## Tool Name
 **KMIR**
 
@@ -75,9 +73,6 @@ We will automate this process in the frontend code to prevent the user from havi
 
 - **[KEVM Semantics](https://github.com/kframework/evm-semantics)**  
   KEVM provides a practical, executable formal specification of the Ethereum Virtual Machine using the K Framework, demonstrating K’s real-world application for verifying blockchain virtual machines.
-
-_If there are noteworthy examples of using the tool to perform verification, please include them in this section. Links, papers, etc._
-_Also include mechanisms for the committee to audit the implementation and correctness of this tool (e.g., regression tests)._
 
 ## Versioning
 KMIR and Stable MIR JSON are both developed using git, and will have semantic version numbers as soon as releases are made.
