@@ -6,7 +6,7 @@
 fn main() {
 
     let a:usize = 42;
-    let b:usize = 22;
+    let b:usize = 43;
     let c:usize = 0;
 
     let result = maximum(a, b, c);
@@ -33,15 +33,17 @@ In a future version, we will be able to start directly with the `maximum` functi
 
 ## Extracting Stable MIR for the program
 
-Before we can run the program using the MIR semantics, we have to compile it with a special compiler to extract Stable MIR from it. This step differs a bit depending on whether the program has multiple crates, in our case it is just a simple `rustc` invocation. This creates `main-max-with-lt.smir.json`. (Run the below commmands from the `mir-semantics/rust-verification-proofs/maximum-proof/` directory).
+Before we can run the program using the MIR semantics, we have to compile it with a special compiler to extract Stable MIR from it. This step differs a bit depending on whether the program has multiple crates, in our case it is just a simple invocation of the extraction tool. Assuming the tool is installed as `stable-mir-json` (as in the docker image provided):
 
 ```shell
-cargo -Z unstable-options -C ../../deps/stable-mir-json/ run -- -Zno-codegen --out-dir $PWD $PWD/main-max-with-lt.rs
+stable-mir-json -Zno-codegen --out-dir . main-max-with-lt.rs
 ```
-The Stable MIR for the program can also be rendered as a graph, using the `--dot` option. This creates `main-max-with-lt.smir.dot`.
+This creates `main-max-with-lt.smir.json`. The `-Zno-codegen` and `--out-dir` options are passed through to the underlying `rustc` so no executable is generated.
+
+The Stable MIR for the program can also be rendered as a graph, using `--dot` as the first option. This creates `main-max-with-lt.smir.dot`.
 
 ```shell
-cargo -Z unstable-options -C ../../deps/stable-mir-json/ run -- --dot -Zno-codegen --out-dir $PWD $PWD/main-max-with-lt.rs
+stable-mir-json --dot -Zno-codegen --out-dir . main-max-with-lt.rs
 ```
 ## Constructing the claim by executing `main` to certain points
 Through concrete execution of the parsed K program we can interrupt the execution after a given number of rewrite steps to inspect the intermediate state. This will help us with writing our claim manually until the process is automated.
@@ -50,7 +52,7 @@ Through concrete execution of the parsed K program we can interrupt the executio
    The following command runs it and displays the resulting program state.
 
     ```shell
-    poetry -C ../../kmir/ run -- kmir run $PWD/main-max-with-lt.smir.json --depth 22 | less -S
+    kmir run main-max-with-lt.smir.json --depth 22 | less -S
     ```
     - Arguments `a`, `b`, and `c` are initialised to `Integer`s as `locals[1]` to `locals[3]`
     - A `call` terminator calling function `ty(25)` is executed next (front of the `k` cell)
@@ -60,7 +62,7 @@ Through concrete execution of the parsed K program we can interrupt the executio
    The following command runs it and displays the resulting program state.
 
     ```shell
-    poetry -C ../../kmir/ run -- kmir run $PWD/main-max-with-lt.smir.json --depth 92 | less -S
+    kmir run main-max-with-lt.smir.json --depth 92 | less -S
     ```
     - The value `locals[0]` is now set to an `Integer`. This will be the target of our assertions.
     - A `return` terminator is executed next (front of the `k` cell), it will return `locals[0]`
@@ -88,11 +90,11 @@ Alternatively, it is possible to construct a claim that the entire rest of the p
 ## Running the prover on the claim and viewing the proof
 Now that we have constructed claim, we can run use the KMIR verifier to perform symbollic execution, and can view the state of proof through the KMIR proof viewer.
 ```shell
-poetry -C ../../kmir/ run -- kmir prove run  $PWD/maximum-spec.k --proof-dir $PWD/proof
+kmir prove run  maximum-spec.k --proof-dir ./proof
 ```
 
 The proof steps are saved in the `$PWD/proof` directory for later inspection using `kmir prove view`. This is especially important when the proof does _not_ succeed immediately.
 
 ```shell
-poetry -C ../../kmir/ run -- kmir prove view MAXIMUM-SPEC.maximum-spec --proof-dir $PWD/proof
+kmir prove view MAXIMUM-SPEC.maximum-spec --proof-dir ./proof
 ```
