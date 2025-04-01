@@ -30,7 +30,7 @@ jobs:
       - name: Run KMIR Verification
         run: |
           cd kmir-proofs
-          for k_file in */*-spec.k"; do
+          for k_file in */*-spec.k; do
             echo "Running ${k_file}"
             kmir prove run ${k_file} --proof-dir $(dirname ${k_file})/proofs
           done
