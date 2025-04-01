@@ -48,21 +48,71 @@ stable-mir-json --dot -Zno-codegen --out-dir . main-max-with-lt.rs
 ## Constructing the claim by executing `main` to certain points
 Through concrete execution of the parsed K program we can interrupt the execution after a given number of rewrite steps to inspect the intermediate state. This will help us with writing our claim manually until the process is automated.
 
-1. The program (`main`) reaches the call to `maximum` after 22 steps.  
+1. The program (`main`) reaches the call to `maximum` after 25 steps.  
    The following command runs it and displays the resulting program state.
 
     ```shell
-    kmir run main-max-with-lt.smir.json --depth 22 | less -S
+    kmir run main-max-with-lt.smir.json --depth 25 | less -S
     ```
     - Arguments `a`, `b`, and `c` are initialised to `Integer`s as `locals[1]` to `locals[3]`
     - A `call` terminator calling function `ty(25)` is executed next (front of the `k` cell)
-    - The function table contains `ty(25) -> "maximum" code.
-    - Other state (how `main` continues, its other local variables, and some internal functions) is relevant to the proof we want to perform.
-2. The program executes for a total of 92 steps to reach the point where it `return`s from `maximum`.  
+    - The function table contains `ty(25) -> ... code of "maximum"`.
+    - Other state (how `main` continues, its other local variables, and some internal functions) is not relevant to the proof we want to perform.
+
+```
+<kmir>
+  <k>
+    #execTerminator ( terminator (... kind: terminatorKindCall (... func: operandConstant ( constOperand (... (truncated)
+  </k>
+  <retVal>
+    noReturn
+  </retVal>
+  <currentFunc>
+    ty ( -1 )
+  </currentFunc>
+  <currentFrame>
+    <currentBody>
+      ListItem ( basicBlock (... statements: ...(truncated)
+      ... (truncated)
+    </currentBody>
+    <caller>
+      ty ( -1 )
+    </caller>
+    <dest>
+      place (... local: local ( -1 ) , projection: .ProjectionElems )
+    </dest>
+    <target>
+      noBasicBlockIdx
+    </target>
+    <unwind>
+      unwindActionUnreachable
+    </unwind>
+    <locals>
+      ListItem ( newLocal ( ty ( 1 ) , mutabilityMut ) )
+      ListItem ( typedValue ( Integer ( 42 , 64 , false ) , ty ( 26 ) , mutabilityNot ) )
+      ListItem ( typedValue ( Integer ( 22 , 64 , false ) , ty ( 26 ) , mutabilityNot ) )
+      ListItem ( typedValue ( Integer ( 0 , 64 , false ) , ty ( 26 ) , mutabilityNot ) )
+      ListItem ( newLocal ( ty ( 26 ) , mutabilityNot ) )
+      ...(truncated)
+    </locals>
+  </currentFrame>
+  <stack>
+    .List
+  </stack>
+  <functions>
+    ty ( 13 ) |-> monoItemFn (... (truncated)
+    ...
+    ty ( 25 ) |-> monoItemFn (... name: symbol ( "maximum" ) , id: defId ( 7 ) , body: someBody ( body (... (truncated)
+    ...
+  </functions>
+  ...(truncated)
+```
+
+2. The program executes for a total of 110 steps to reach the point where it `return`s from `maximum`.  
    The following command runs it and displays the resulting program state.
 
     ```shell
-    kmir run main-max-with-lt.smir.json --depth 92 | less -S
+    kmir run main-max-with-lt.smir.json --depth 110 | less -S
     ```
     - The value `locals[0]` is now set to an `Integer`. This will be the target of our assertions.
     - A `return` terminator is executed next (front of the `k` cell), it will return `locals[0]`
