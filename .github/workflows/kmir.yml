@@ -1,0 +1,38 @@
+name: KMIR
+
+on:
+  workflow_dispatch:
+  merge_group:
+  pull_request:
+    branches: [ main ]
+  push:
+    paths:
+      - 'library/**'
+      - '.github/workflows/kmir.yml'
+      - 'kmir-proofs/**'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  run-kmir-proofs:
+    name: Run supplied KMIR proofs
+    runs-on: ubuntu-latest
+    container: runtimeverificationinc/kmir:ubuntu-jammy-0.3.112_7.1.229-daf5158
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          path: head      
+
+      - name: Run KMIR Verification
+        run: |
+          cd kmir-proofs
+          for k_file in */*-spec.k"; do
+            echo "Running ${k_file}"
+            kmir prove run ${k_file} --proof-dir $(dirname ${k_file})/proofs
+          done
+
+          
