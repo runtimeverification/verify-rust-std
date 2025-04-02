@@ -27,7 +27,7 @@ jobs:
           docker run --detach --rm -t \
             --name ${{ env.container_name }} \
             -w /workspace \
-            runtimeverificationinc/kmir:ubuntu-jammy-0.3.112_7.1.229-daf5158 /bin/bash
+            runtimeverificationinc/kmir:ubuntu-jammy-0.3.112_7.1.229-9e17ccd /bin/bash
 
       - name: Copy KMIR proofs into container
         run: |
