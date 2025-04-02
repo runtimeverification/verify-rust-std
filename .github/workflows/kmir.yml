@@ -26,15 +26,18 @@ jobs:
         run: |
           docker run --detach --rm -t \
             --name ${{ env.container_name }} \
-            -v $PWD:/workspace -w /workspace \
-            -u $(id -u):$(id -g) \
+            -w /workspace \
             runtimeverificationinc/kmir:ubuntu-jammy-0.3.112_7.1.229-daf5158 /bin/bash
+
+      - name: Copy KMIR proofs into container
+        run: |
+          docker cp kmir-proofs ${{ env.container_name }}:/workspace/kmir-proofs
 
       - name: Run KMIR Verification for all proofs provided
         run: |
           for k_file in kmir-proofs/*/*-spec.k; do
             echo "Running ${k_file}"
-            docker exec ${{ env.container_name }} kmir prove run ${k_file} --proof-dir $(dirname ${k_file})/proofs
+            docker exec -t ${{ env.container_name }} kmir prove run ${k_file} --proof-dir $(dirname ${k_file})/proofs
           done
 
       - name: Stop Tool Container
