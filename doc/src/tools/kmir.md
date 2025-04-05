@@ -51,15 +51,15 @@ example of a KMIR proof being analyzed using the KCFG viewer can be seen below:
 ## Tool Information
 
 * [x] Does the tool perform Rust verification?
-  *Yes – It performs verification at the MIR level, which is a critical
-  intermediate representation of Rust programs.*
+  *Yes – It performs verification at the MIR level, an intermediate
+  representation of Rust programs in the Rust compiler `rustc`.*
 * [x] Does the tool deal with *unsafe* Rust code?
   *Yes – By operating on MIR, KMIR can analyze both safe and unsafe Rust code.*
 * [x] Does the tool run independently in CI?
   *Yes – KMIR can be integrated into CI workflows via our package manager and
-  Nix-based build system.*
+  Nix-based build system or through a docker image provided.*
 * [x] Is the tool open source?
-  *Yes – KMIR is open source and available on GitHub.*
+  *Yes – KMIR is [open source and available on GitHub](https://github.com/runtimeverification/mir-semantics).*
 * [x] Is the tool under development?
   *Yes – KMIR is actively under development, with ongoing improvements to MIR
   syntax coverage and verification capabilities.*
@@ -75,7 +75,7 @@ Goto-transcoder (ESBMC).
   utilizing a unique verification backend through the K framework and
   reachability logic (as explained in the description above). KMIR has little
   dependence on an SAT solver or SMT solver. Kani's CBMC backend and
-  Goto-transcode (ESBMC) encode the verification problem into an SAT / SMT
+  Goto-transcoder (ESBMC) encode the verification problem into an SAT / SMT
   verification condition to be discharged by the appropriate solver. Kani
   recently added a Lean backend through Aeneas, however Lean does not support
   matching or reachability logic currently. Verifast performs symbollic
@@ -99,6 +99,8 @@ for full license details.
 
 ## Steps to Use the Tool
 
+**TODO Edit this to avoid mentioning `kup` and describe the high-level workflow only**
+
 At RV, we generally strives to use
 [kup](https://github.com/runtimeverification/kup) , a `nix`-based software
 installer, to distribute our software.  This is future work, at the moment
@@ -120,14 +122,10 @@ At the time of writing, step 3 requires manual work to set up a _claim_ in the K
 language. We will automate this process in the frontend code to prevent the
 user from having to write K code.
 
-**To see the specifications and run proofs using KMIR, including a subsection of
-the proofs required in the [Safety of Methods for Numeric Primitive
-Types](https://model-checking.github.io/verify-rust-std/challenges/0011-floats-ints.html#challenge-11-safety-of-methods-for-numeric-primitive-types)
-challenges, check this [instructional
-document](https://github.com/runtimeverification/mir-semantics/blob/sample-challenge-11-proofs/rust-verification-proofs/README.md)
-in our tool's repository.**
+Small examples of proofs using KMIR, and how to derive them from a
+Rust program manually, are [provided in the `kmir-proofs` directory]().
 
-## Artifacts & Audit Mechanisms
+## Background Reading
 
 - **[Matching Logic](http://www.matching-logic.org/)**
   Matching Logic is a foundational logic underpinning the K framework, providing
@@ -139,15 +137,6 @@ in our tool's repository.**
   defining programming languages, type systems, and formal analysis tools. It
   automatically generates language analysis tools directly from their formal
   semantics.
-
-- **[Kontrol](https://kontrol.runtimeverification.com)**
-  Kontrol is a formal verification tool built on K's semantics, enabling
-  symbolic execution and proof construction for Ethereum smart contracts.
-
-- **[KEVM Semantics](https://github.com/kframework/evm-semantics)**
-  KEVM provides a practical, executable formal specification of the Ethereum
-  Virtual Machine using the K Framework, demonstrating K’s real-world
-  application for verifying blockchain virtual machines.
 
 ## Versioning
 KMIR and Stable MIR JSON are both version controlled using git and hosted by
@@ -177,3 +166,11 @@ Our current Registries / Caches are:
 1. [Binary Cachix cache used by Kup](https://app.cachix.org/cache/k-framework-binary)
 2. Source code on GitHub: [mir-semantics]](https://github.com/runtimeverification/mir-semantics) and [stable-mir-json](https://github.com/runtimeverification/stable-mir-json)
 3. [Container image on Dockerhub](https://hub.docker.com/u/runtimeverificationinc)
+
+The [KMIR docker
+image](https://github.com/runtimeverification/mir-semantics/blob/c221c81d73a56c48692a087a2ced29917de99246/Dockerfile.kmir)
+is the best option for both casual users of KMIR and CI. It contains
+an installation of K Framework, the tool `kmir`, and the
+`stable-mir-json` extraction tool, which is a custom version of
+`rustc` which extracts Stable MIR as JSON or as graphviz' *.dot when
+compiling a crate.
