@@ -263,6 +263,17 @@ language to express pre- and post-conditions.
   library functions are provided in the
   [`kmir-proofs`](https://github.com/model-checking/verify-rust-std/tree/main/kmir-proofs)
   directory of this repository.
+- As a larger-scale case study, KMIR has been applied to formally verify the
+  equivalence of the [Solana SPL Token
+  program](https://github.com/runtimeverification/solana-token/) and its
+  pinocchio-based reimplementation (P-Token). The verification specs are on the
+  [`proofs` branch](https://github.com/runtimeverification/solana-token/tree/proofs)
+  with over 50 proof targets covering token operations (transfer, mint, burn,
+  freeze, approve, etc.), and results are tracked in
+  [issue #24](https://github.com/runtimeverification/solana-token/issues/24)
+  (non-multisig) and
+  [issue #97](https://github.com/runtimeverification/solana-token/issues/97)
+  (multisig).
 - The K Framework itself has been used to formally verify production systems
   including the [KEVM Ethereum virtual machine
   semantics](https://github.com/runtimeverification/evm-semantics) and various
