@@ -1,4 +1,4 @@
-// @kmir prove-rs: unchecked_add_i32 unchecked_sub_usize unchecked_mul_isize
+// @kmir prove: unchecked_add_i32 unchecked_sub_usize unchecked_mul_isize
 
 fn main() {
     unchecked_add_i32(1,2);

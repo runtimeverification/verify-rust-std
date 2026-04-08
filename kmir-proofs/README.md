@@ -20,9 +20,10 @@ installed and available on the path.
 
 ## Program Property Proofs in KMIR 
 
-The most user-friendly way to create and run a proof in KMIR is the `prove-rs`
-functionality, which allows a user to prove that a given program will
-run to completion without an error.
+The most user-friendly way to create and run a proof in KMIR is the `kmir prove`
+command (also available as `kmir prove-rs` for backward compatibility), which
+allows a user to prove that a given program will run to completion without an
+error.
 
 Desired post-conditions of the program, such as properties of the computed result,
 can be formulated as simple `assert` statements. Preconditions can be modelled
@@ -42,11 +43,17 @@ the `$block` is executed, we can assume that the boolean expression `$pre` holds
 true.
 
 KMIR will stop executing the program as soon as any undefined behaviour arises
-from the executed statements. Therefore, running to completion proves the absense
+from the executed statements. Therefore, running to completion proves the absence
 of undefined behaviour, as well as the post-conditions expressed as assertions
 (possibly under the assumption of preconditions modelled using the above macro).
 
-## Example: Proving Absense of Undefined Behaviour in `unchecked_*` arithmetic
+The `--terminate-on-thunk` flag is recommended for all proofs. It ensures that
+if the prover encounters a MIR construct with incomplete semantics support, the
+proof halts cleanly rather than silently propagating through unsupported
+operations. This guarantees that a passing proof is sound with respect to the
+supported MIR fragment.
+
+## Example: Proving Absence of Undefined Behaviour in `unchecked_*` arithmetic
 
 The proofs in subdirectory `unchecked_arithmetic` concern a section of
 the challenge of securing [Safety of Methods for Numeric Primitive
@@ -85,13 +92,14 @@ If the sum of the two arguments `a` and `b` does not exceed the bounds of type `
 not trigger undefined behaviour and produce the correct result, expressed by the
 `precondition` macro and the assertion at the end of the unsafe block.
 
-To run the proof, we execute `kmir prove-rs` and provide the function name as
+To run the proof, we execute `kmir prove` and provide the function name as
 the `--start-symbol`. The `--verbose` option allows for watching the proof being
 executed, the `--proof-dir` will contain data about the proof's intermediate states
-that can be inspected afterwards.
+that can be inspected afterwards. The `--terminate-on-thunk` flag ensures
+soundness by halting the proof if any unsupported construct is encountered.
 
 ```shell
-kmir prove-rs unchecked_arithmetic.rs --proof-dir proof --start-symbol unchecked_add_i32 --verbose
+kmir prove unchecked_arithmetic.rs --proof-dir proof --start-symbol unchecked_add_i32 --verbose --terminate-on-thunk
 ```
 
 After the proof finishes, the prover reports whether it passed or failed, and some
@@ -100,7 +108,7 @@ The graph can be shown or interactively inspected using commands `kmir show` and
 
 ```shell
 kmir view --proof-dir proof unchecked_arithmetic.unchecked_add_i32
-kmir show --proof-dir proof unchecked_arithmetic.unchecked_add_i32 [--no-full-printer]
+kmir show --proof-dir proof unchecked_arithmetic.unchecked_add_i32 --statistics --leaves
 ```
 
 While `kmir show` only prints the control flow graph, `kmir view` opens an interactive

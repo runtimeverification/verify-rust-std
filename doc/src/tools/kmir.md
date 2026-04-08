@@ -21,7 +21,7 @@ This diagram describes the extraction and verification workflow for KMIR:
 ![kmir_env_diagram_march_2025](https://github.com/user-attachments/assets/bf426c8d-f241-4ad6-8cb2-86ca06d8d15b)
 
 
-The K Framework ([kframework.org](https://kframework.org/) is the basis of how
+The [K Framework](https://kframework.org/) is the basis of how
 KMIR operates to guarantee properties of Rust programs. K is a rewrite-based
 semantic framework based on [matching logic](http://www.matching-logic.org/) in
 which programming languages, their operational semantics and type systems, and
@@ -55,8 +55,12 @@ This state cannot be unified with a valid target state in the proof, so the proo
 fails. KMIR systematically explores all feasible paths under the user-supplied 
 preconditions. Only when **every** path terminates without hitting UB *and* 
 satisfies the target property does KMIR declare the program UB-free (and correct 
-for the property). This ensures that any “no UB” claim holds under the sole assumption
-that KMIR’s implementation is correct. 
+for the property). Additionally, the `--terminate-on-thunk` flag (recommended for all proofs)
+ensures that if the symbolic execution reaches a MIR construct whose semantics
+are not yet implemented, the proof halts cleanly rather than silently passing
+through unsupported operations. This ensures that any “no UB” claim holds under
+the sole assumption that KMIR’s implementation of the supported MIR fragment is
+correct. 
 
 Programs modelled in K Framework can be executed _symbolically_, i.e., operating 
 on abstract input which is not fully specified but characterized by _path conditions_ 
@@ -83,7 +87,7 @@ one of several possible techniques can be used:
    need to be written in K's native language.
 2) As potential future work, it would be possible to implement an annotation
    language to provide the required context for loop invariant directly in
-   source code (as done in the past using natspec for Solitidy code).
+   source code (as done in the past using natspec for Solidity code).
 3) In general, K also supports bounded loop unrolling, by way of identifying
    loop heads and counting how many times the same loop head has been observed.
    This technique is managed by the all-path reachability prover library for
@@ -91,9 +95,52 @@ one of several possible techniques can be used:
    special support from the back-end.
 
 Our front-end, at the time of writing, does not have either of these
-options turned on. As soon as larger programs will require it, we will decide
-whether the preference is to implement support for user-supplied K-level
-loop invariants, or bounded loop unrolling support, or (probably) offer both.
+options turned on. When a proof involves an unbounded loop or recursion
+without an invariant, the symbolic execution continues exploring paths
+until a configurable bound is reached (via `--max-depth` or
+`--max-iterations`). If the bound is exceeded before all paths are
+fully explored, the proof does **not** pass — it results in stuck or
+pending nodes in the control flow graph, which KMIR reports as a
+non-passing proof. This means KMIR will never silently claim
+correctness for programs with unbounded behavior that it cannot fully
+explore. As soon as larger programs will require it, we will offer
+user-supplied K-level loop invariants and/or bounded loop unrolling
+support.
+
+### Known Limitations
+
+KMIR is under active development. The following limitations apply to
+the current version:
+
+- **MIR construct coverage:** KMIR supports a substantial subset of
+  Stable MIR including integer and float arithmetic, structs, enums
+  (including niche-encoded variants), arrays, closures, unions,
+  transmute casts, pointer offsets, global and heap allocations,
+  volatile load/store, and function pointers. Constructs **not yet
+  supported** include: async/await, trait objects (`dyn`), iterators,
+  `Vec`/`String`/`HashMap`, `Box`/`Rc`/`Arc` (smart pointers),
+  multi-threading, panic unwinding, and `Drop` destructors.
+- **Thunk mechanism for unsupported constructs:** When KMIR encounters
+  an operation whose semantics are not yet implemented, it produces a
+  _thunk_ — a placeholder that marks the unsupported operation. With
+  `--terminate-on-thunk` (recommended for all proofs), the proof halts
+  at this point, ensuring unsupported operations are never silently
+  skipped. Without this flag, the thunk propagates through the proof
+  state and the proof will typically not pass because the thunk cannot
+  unify with a valid target state.
+- **Loop invariants:** User-supplied loop invariants are supported in
+  principle via K's native language but are not yet exposed through a
+  Rust-level annotation language. Programs with unbounded loops require
+  manual K-level invariant specification or bounded exploration.
+- **Invalid loop invariants:** If a user provides a K-level invariant
+  that is not actually inductive, the prover will detect this: the
+  proof step that attempts to apply the invariant will fail to
+  discharge its side conditions, resulting in a stuck proof node. The
+  proof will not pass.
+
+For the most up-to-date list of supported features and known issues,
+see the [mir-semantics issue
+tracker](https://github.com/runtimeverification/mir-semantics/issues).
 
 KMIR also prioritizes UI with interactive proof exploration available
 out-of-the-box through the terminal KCFG (K Control Flow Graph) viewer, allowing
@@ -182,17 +229,19 @@ Rust programs that `stable-mir-json` extracts.
 
 * Run Stable MIR code extracted from Rust programs (`kmir run my-program.smir.json`);
 * Prove that a given Rust program or function will terminate without panics or
-  undefined behaviour (`kmir prove-rs my-program.rs [--start-symbol my_function]`).
+  undefined behaviour (`kmir prove my-program.rs [--start-symbol my_function]`;
+  also available as `kmir prove-rs` for backward compatibility).
   This command invokes `stable-mir-json` internally, and then performs an all-path
-  reachability proof that the program reaches normal termination  under all possible inputs.
-  Any statements that would panic or cause undefined behaviour will terminate execution
-  so this proves the successful execution. Pre-and post-conditions can be modelled
-  using assertions and conditional execution.
-* (Advanced use for K experts:) Prove a property about a Rust program, which is given
-  as a K "claim" and proven using an all-path reachability proof in K
-  (`kmir prove my-program-spec.k`);
+  reachability proof that the program reaches normal termination under all possible
+  inputs. Any statements that would panic or cause undefined behaviour will terminate
+  execution so this proves the successful execution. Pre- and post-conditions can be
+  modelled using assertions and conditional execution. The `--terminate-on-thunk`
+  flag is recommended to ensure soundness (see Known Limitations above).
+* (Advanced use for K experts:) Prove a property about a Rust program, which is
+  given as a K "claim" and proven using an all-path reachability proof in K
+  (`kmir prove my-program-spec.k --smir`);
 * Print or inspect the control flow graph of a program's proof constructed by the
-  `kmir prove` or `kmir prove-rs` commands (`kmir show module.proof_identifier`
+  `kmir prove` command (`kmir show module.proof_identifier`
   and `kmir view module.proof_identifier`);
 
 An example of proofs using KMIR, and how to construct them in Rust code,
@@ -203,6 +252,50 @@ The `kmir` tool is under active development at the time of writing.
 Future development will include using source code annotations instead of explicit
 test functions to better integrate with Rust code bases, using a suitable annotation
 language to express pre- and post-conditions.
+
+## Artifacts & Audit Mechanisms
+
+- The [mir-semantics repository](https://github.com/runtimeverification/mir-semantics)
+  includes a comprehensive regression test suite that is run on every PR via CI.
+  This test suite covers MIR construct parsing, concrete execution, and symbolic
+  proof scenarios, ensuring the correctness of the KMIR semantics implementation.
+- Example proofs demonstrating KMIR's verification capabilities on Rust standard
+  library functions are provided in the
+  [`kmir-proofs`](https://github.com/model-checking/verify-rust-std/tree/main/kmir-proofs)
+  directory of this repository.
+- The K Framework itself has been used to formally verify production systems
+  including the [KEVM Ethereum virtual machine
+  semantics](https://github.com/runtimeverification/evm-semantics) and various
+  smart contract languages, providing a track record of formal verification at
+  scale.
+
+## Versioning
+
+KMIR follows a sequential version numbering scheme. Releases are published as
+Docker images on [Docker
+Hub](https://hub.docker.com/r/runtimeverificationinc/kmir/tags) with tags in the
+format `ubuntu-jammy-{version}` (e.g., `ubuntu-jammy-0.4.202`). The version
+number is incremented with each release and corresponds to the state of the
+[mir-semantics repository](https://github.com/runtimeverification/mir-semantics)
+at the time of release. Version updates to the CI workflow in this repository are
+managed by the Runtime Verification team, coordinated with updates to the proof
+examples to ensure continued compatibility.
+
+## CI Integration
+
+The KMIR CI workflow (`.github/workflows/kmir.yml`) runs KMIR proofs on every
+pull request and push to the `main` branch. The workflow:
+
+1. Checks out the repository.
+2. Runs a Docker container using the pinned KMIR image from Docker Hub.
+3. Executes the proof runner script (`kmir-proofs/unchecked_arithmetic/run-proofs.sh`),
+   which iterates over annotated proof targets in the Rust source files and
+   invokes `kmir prove` with `--terminate-on-thunk` for each target.
+4. Each proof must pass (all paths reach normal termination without UB) for the
+   CI check to succeed.
+
+The Docker-based approach ensures reproducibility across environments and avoids
+the need to install the K Framework toolchain in CI.
 
 ## Background Reading
 
