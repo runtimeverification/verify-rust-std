@@ -11,6 +11,10 @@ defaults:
 
 jobs:
   update-subtree-library:
+    permissions:
+      contents: write
+      pull-requests: write
+    if: github.repository == 'model-checking/verify-rust-std'
     # Changing the host platform may alter the libgit2 version as used by
     # splitsh-lite, which will require changing the version of git2go.
     # See https://github.com/jeffWelling/git2go?tab=readme-ov-file#which-go-version-to-use
@@ -85,6 +89,7 @@ jobs:
       if: ${{ env.SUBTREE_PR_EXISTS == 'no' }}
       run: |
         cd splitsh-lite
+        sudo apt-get update
         sudo apt-get install -y golang libgit2-dev
         # git2go upstream hasn't been updated to more recent versions of
         # libgit2, so using a fork that does stay up to date
@@ -110,6 +115,10 @@ jobs:
         fi
 
         git checkout ${NEXT_COMMIT_HASH}
+        # Collect submodule commits; note that submodules (intentionally!)
+        # aren't initialized, hence lines will be prefixed with "-" (see git
+        # submodule --help).
+        git submodule status  -- library/ | sed 's/^-//' > ../submodule-heads
         /usr/bin/time -v ../splitsh-lite/splitsh-lite --progress --prefix=library --target subtree/library
         git checkout -b subtree/library subtree/library
 
@@ -126,44 +135,76 @@ jobs:
         UPSTREAM_HEAD=$(git log --format=%H -n 1 rust-filtered/subtree/library)
         if [ "${UPSTREAM_HEAD}" = "${UPSTREAM_FROM}" ]; then
           echo "Nothing to do, ${UPSTREAM_FROM} matches ${UPSTREAM_HEAD} (${SUBTREE_HEAD_MSG})"
-          echo "MERGE_CONFLICTS=noop" >> $GITHUB_ENV
+          echo "SUBTREE_PR_REQUIRED=no" >> $GITHUB_ENV
         else
           git branch --set-upstream-to=origin/subtree/library
-          echo "MERGE_CONFLICTS=maybe" >> $GITHUB_ENV
+          echo "SUBTREE_PR_REQUIRED=yes" >> $GITHUB_ENV
         fi
 
     - name: Create Pull Request to update subtree/library
-      if: ${{ env.MERGE_CONFLICTS != 'noop' && env.SUBTREE_PR_EXISTS == 'no' }}
+      if: ${{ env.SUBTREE_PR_REQUIRED == 'yes' && env.SUBTREE_PR_EXISTS == 'no' }}
       uses: peter-evans/create-pull-request@v7
       with:
         title: 'Update subtree/library to ${{ env.NEXT_TOOLCHAIN_DATE }}'
-        body: |
+        body: >
           This is an automated PR to update the subtree/library branch to the changes
-          from ${{ env.CURRENT_TOOLCHAIN_DATE }} (${{ env.CURRENT_COMMIT_HASH }})
-          to ${{ env.NEXT_TOOLCHAIN_DATE }} (${{ env.NEXT_COMMIT_HASH }}), inclusive.
-          **Do not merge this PR using the merge queue. Instead, use the rebase strategy.**
+          from ${{ env.CURRENT_TOOLCHAIN_DATE }} (rust-lang/rust@${{ env.CURRENT_COMMIT_HASH }})
+          to ${{ env.NEXT_TOOLCHAIN_DATE }} (rust-lang/rust@${{ env.NEXT_COMMIT_HASH }}), inclusive.
+
+          **Review this PR as usual, but do not merge this PR using the GitHub web interface.
+          Instead, once it is approved, use `git push` to literally push the changes to `subtree/library`
+          without any rebase or merge.**
         branch: update-subtree/library
         delete-branch: true
         base: subtree/library
         path: verify-rust-std
 
     - name: Merge subtree/library changes
-      if: ${{ env.MERGE_CONFLICTS != 'noop' && env.MERGE_PR_EXISTS == 'no' }}
+      if: ${{ env.CURRENT_TOOLCHAIN_DATE != env.NEXT_TOOLCHAIN_DATE && env.MERGE_PR_EXISTS == 'no' }}
       run: |
         cd verify-rust-std
-        if ! git rev-parse --verify subtree/library; then
+        # create-pull-request resets branches locally, implying that
+        # `subtree/library` no longer is what the above instructions created.
+        if [ "${SUBTREE_PR_EXISTS}" = "yes" ]; then
           git checkout -t -b subtree/library origin/update-subtree/library
+        else
+          git checkout subtree/library
+          if [ "${SUBTREE_PR_REQUIRED}" = "yes" ]; then
+            git reset --hard origin/update-subtree/library
+          fi
         fi
         git checkout main
+        git submodule foreach 'git fetch'
+
+        # Tell git about the correct merge base to use, which is the subtree
+        # head that we last merged from.
+        PREV_SUBTREE_HEAD=$(git log --grep="^git-subtree-split:" | egrep '^[[:space:]]+git-subtree-split:' | awk '{print $2;exit}')
+        echo "Previous subtree head: ${PREV_SUBTREE_HEAD}"
+        git replace --graft subtree/library ${PREV_SUBTREE_HEAD}
+        git replace --graft main ${PREV_SUBTREE_HEAD}
 
         # This command may fail, which will require human intervention.
         if ! git \
             -c user.name=gitbot -c user.email=git@bot \
-            subtree merge --prefix=library subtree/library --squash; then
+            merge -Xsubtree=library subtree/library; then
           echo "MERGE_CONFLICTS=yes" >> $GITHUB_ENV
+          # Ignore submodule conflicts, those are dealt with below.
+          for d in $(cat ../submodule-heads | cut -f2 -d" ") ; do git reset HEAD $d ; done
           git -c user.name=gitbot -c user.email=git@bot commit -a -m "Merge from $NEXT_COMMIT_HASH with conflicts"
         else
           echo "MERGE_CONFLICTS=no" >> $GITHUB_ENV
+        fi
+        git replace -d subtree/library
+        git replace -d main~1
+        NEW_SUBTREE_HEAD=$(git rev-parse subtree/library)
+        echo "NEW_SUBTREE_HEAD=${NEW_SUBTREE_HEAD}" >> $GITHUB_ENV
+
+        # Set submodules to upstream versions
+        git submodule update --init
+        git submodule foreach 'grep $sm_path $toplevel/../submodule-heads | cut -f1 -d" " | xargs git checkout'
+        if ! git diff --quiet; then
+          git -c user.name=gitbot -c user.email=git@bot \
+            commit -m "Update submodules" library/
         fi
 
         sed -i "s/^channel = \"nightly-.*\"/channel = \"nightly-${NEXT_TOOLCHAIN_DATE}\"/" rust-toolchain.toml
@@ -173,16 +214,34 @@ jobs:
         sed -i "s/commit = .*/commit = \"${KANI_COMMIT_HASH}\"/" tool_config/kani-version.toml
         git -c user.name=gitbot -c user.email=git@bot \
           commit -m "Update Kani version to ${KANI_COMMIT_HASH}" tool_config/kani-version.toml
+
+        # Try to automatically patch the VeriFast proofs
+        pushd verifast-proofs
+        ./patch-verifast-proofs.sh
+        if ! git diff --quiet; then
+          git -c user.name=gitbot -c user.email=git@bot \
+            commit . -m "Update VeriFast proofs"
+        else
+          # The original files have not changed; no updates to the VeriFast proofs are necessary.
+          true
+        fi
+        popd
+
     - name: Create Pull Request without conflicts
       if: ${{ env.MERGE_CONFLICTS == 'no' && env.MERGE_PR_EXISTS == 'no' }}
       uses: peter-evans/create-pull-request@v7
       with:
         title: 'Merge subtree update for toolchain nightly-${{ env.NEXT_TOOLCHAIN_DATE }}'
-        body: |
+        body: >
           This is an automated PR to merge library subtree updates
-          from ${{ env.CURRENT_TOOLCHAIN_DATE }} (${{ env.CURRENT_COMMIT_HASH }})
-          to ${{ env.NEXT_TOOLCHAIN_DATE }} (${{ env.NEXT_COMMIT_HASH }}), inclusive.
+          from ${{ env.CURRENT_TOOLCHAIN_DATE }} (rust-lang/rust@${{ env.CURRENT_COMMIT_HASH }})
+          to ${{ env.NEXT_TOOLCHAIN_DATE }} (rust-lang/rust@${{ env.NEXT_COMMIT_HASH }}), inclusive.
           This is a clean merge, no conflicts were detected.
+          **Do not remove or edit the following annotations:**
+
+          git-subtree-dir: library
+
+          git-subtree-split: ${{ env.NEW_SUBTREE_HEAD }}
         branch: sync-${{ env.NEXT_TOOLCHAIN_DATE }}
         delete-branch: true
         base: main
@@ -193,12 +252,17 @@ jobs:
       uses: peter-evans/create-pull-request@v7
       with:
         title: 'Merge subtree update for toolchain nightly-${{ env.NEXT_TOOLCHAIN_DATE }}'
-        body: |
+        body: >
           This is an automated PR to merge library subtree updates
-          from ${{ env.CURRENT_TOOLCHAIN_DATE }} (${{ env.CURRENT_COMMIT_HASH }})
-          to ${{ env.NEXT_TOOLCHAIN_DATE }} (${{ env.NEXT_COMMIT_HASH }}) (inclusive)
+          from ${{ env.CURRENT_TOOLCHAIN_DATE }} (rust-lang/rust@${{ env.CURRENT_COMMIT_HASH }})
+          to ${{ env.NEXT_TOOLCHAIN_DATE }} (rust-lang/rust@${{ env.NEXT_COMMIT_HASH }}) (inclusive)
           into main. `git merge` resulted in conflicts, which require manual resolution.
           Files were commited with merge conflict markers.
+          **Do not remove or edit the following annotations:**
+
+          git-subtree-dir: library
+
+          git-subtree-split: ${{ env.NEW_SUBTREE_HEAD }}
         branch: sync-${{ env.NEXT_TOOLCHAIN_DATE }}
         delete-branch: true
         base: main

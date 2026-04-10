@@ -10,26 +10,31 @@ use core::ptr::{self, NonNull};
 
 unsafe extern "Rust" {
     // These are the magic symbols to call the global allocator. rustc generates
-    // them to call `__rg_alloc` etc. if there is a `#[global_allocator]` attribute
+    // them to call the global allocator if there is a `#[global_allocator]` attribute
     // (the code expanding that attribute macro generates those functions), or to call
     // the default implementations in std (`__rdl_alloc` etc. in `library/std/src/alloc.rs`)
     // otherwise.
-    // The rustc fork of LLVM 14 and earlier also special-cases these function names to be able to optimize them
-    // like `malloc`, `realloc`, and `free`, respectively.
     #[rustc_allocator]
     #[rustc_nounwind]
+    #[rustc_std_internal_symbol]
+    #[rustc_allocator_zeroed_variant = "__rust_alloc_zeroed"]
     fn __rust_alloc(size: usize, align: usize) -> *mut u8;
     #[rustc_deallocator]
     #[rustc_nounwind]
+    #[rustc_std_internal_symbol]
     fn __rust_dealloc(ptr: *mut u8, size: usize, align: usize);
     #[rustc_reallocator]
     #[rustc_nounwind]
+    #[rustc_std_internal_symbol]
     fn __rust_realloc(ptr: *mut u8, old_size: usize, align: usize, new_size: usize) -> *mut u8;
     #[rustc_allocator_zeroed]
     #[rustc_nounwind]
+    #[rustc_std_internal_symbol]
     fn __rust_alloc_zeroed(size: usize, align: usize) -> *mut u8;
 
-    static __rust_no_alloc_shim_is_unstable: u8;
+    #[rustc_nounwind]
+    #[rustc_std_internal_symbol]
+    fn __rust_no_alloc_shim_is_unstable_v2();
 }
 
 /// The global memory allocator.
@@ -85,7 +90,7 @@ pub unsafe fn alloc(layout: Layout) -> *mut u8 {
     unsafe {
         // Make sure we don't accidentally allow omitting the allocator shim in
         // stable code until it is actually stabilized.
-        core::ptr::read_volatile(&__rust_no_alloc_shim_is_unstable);
+        __rust_no_alloc_shim_is_unstable_v2();
 
         __rust_alloc(layout.size(), layout.align())
     }
@@ -168,7 +173,7 @@ pub unsafe fn alloc_zeroed(layout: Layout) -> *mut u8 {
     unsafe {
         // Make sure we don't accidentally allow omitting the allocator shim in
         // stable code until it is actually stabilized.
-        core::ptr::read_volatile(&__rust_no_alloc_shim_is_unstable);
+        __rust_no_alloc_shim_is_unstable_v2();
 
         __rust_alloc_zeroed(layout.size(), layout.align())
     }
@@ -357,6 +362,7 @@ unsafe extern "Rust" {
     // This is the magic symbol to call the global alloc error handler. rustc generates
     // it to call `__rg_oom` if there is a `#[alloc_error_handler]`, or to call the
     // default implementations below (`__rdl_oom`) otherwise.
+    #[rustc_std_internal_symbol]
     fn __rust_alloc_error_handler(size: usize, align: usize) -> !;
 }
 
@@ -402,12 +408,12 @@ pub const fn handle_alloc_error(layout: Layout) -> ! {
         }
     }
 
-    #[cfg(not(feature = "panic_immediate_abort"))]
+    #[cfg(not(panic = "immediate-abort"))]
     {
         core::intrinsics::const_eval_select((layout,), ct_error, rt_error)
     }
 
-    #[cfg(feature = "panic_immediate_abort")]
+    #[cfg(panic = "immediate-abort")]
     ct_error(layout)
 }
 
@@ -423,10 +429,11 @@ pub mod __alloc_error_handler {
         unsafe extern "Rust" {
             // This symbol is emitted by rustc next to __rust_alloc_error_handler.
             // Its value depends on the -Zoom={panic,abort} compiler option.
-            static __rust_alloc_error_handler_should_panic: u8;
+            #[rustc_std_internal_symbol]
+            fn __rust_alloc_error_handler_should_panic_v2() -> u8;
         }
 
-        if unsafe { __rust_alloc_error_handler_should_panic != 0 } {
+        if unsafe { __rust_alloc_error_handler_should_panic_v2() != 0 } {
             panic!("memory allocation of {size} bytes failed")
         } else {
             core::panicking::panic_nounwind_fmt(

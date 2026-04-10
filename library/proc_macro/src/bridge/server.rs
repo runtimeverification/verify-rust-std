@@ -40,10 +40,10 @@ macro_rules! define_server_handles {
                 }
             }
 
-            impl<'s, S: Types> Decode<'_, 's, HandleStore<MarkedTypes<S>>>
+            impl<'s, S: Types> DecodeMut<'_, 's, HandleStore<MarkedTypes<S>>>
                 for &'s Marked<S::$oty, client::$oty>
             {
-                fn decode(r: &mut Reader<'_>, s: &'s HandleStore<MarkedTypes<S>>) -> Self {
+                fn decode(r: &mut Reader<'_>, s: &'s mut HandleStore<MarkedTypes<S>>) -> Self {
                     &s.$oty[handle::Handle::decode(r, &mut ())]
                 }
             }
@@ -82,7 +82,6 @@ with_api_handle_types!(define_server_handles);
 pub trait Types {
     type FreeFunctions: 'static;
     type TokenStream: 'static + Clone;
-    type SourceFile: 'static + Clone;
     type Span: 'static + Copy + Eq + Hash;
     type Symbol: 'static;
 }
@@ -179,7 +178,7 @@ macro_rules! define_dispatcher_impl {
                     $(api_tags::Method::$name(m) => match m {
                         $(api_tags::$name::$method => {
                             let mut call_method = || {
-                                reverse_decode!(reader, handle_store; $($arg: $arg_ty),*);
+                                $(let $arg = <$arg_ty>::decode(&mut reader, handle_store);)*
                                 $name::$method(server, $($arg),*)
                             };
                             // HACK(eddyb) don't use `panic::catch_unwind` in a panic.
@@ -296,12 +295,7 @@ impl ExecutionStrategy for SameThread {
 
         let mut dispatch = |buf| dispatcher.dispatch(buf);
 
-        run_client(BridgeConfig {
-            input,
-            dispatch: (&mut dispatch).into(),
-            force_show_panics,
-            _marker: marker::PhantomData,
-        })
+        run_client(BridgeConfig { input, dispatch: (&mut dispatch).into(), force_show_panics })
     }
 }
 
@@ -332,12 +326,7 @@ where
                 client.recv().expect("server died while client waiting for reply")
             };
 
-            run_client(BridgeConfig {
-                input,
-                dispatch: (&mut dispatch).into(),
-                force_show_panics,
-                _marker: marker::PhantomData,
-            })
+            run_client(BridgeConfig { input, dispatch: (&mut dispatch).into(), force_show_panics })
         });
 
         while let Some(b) = server.recv() {

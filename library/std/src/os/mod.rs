@@ -103,7 +103,7 @@ pub mod linux;
         all(target_vendor = "fortanix", target_env = "sgx")
     )
 )))]
-#[cfg(any(target_os = "wasi", doc))]
+#[cfg(any(target_os = "wasi", any(target_env = "p1", target_env = "p2"), doc))]
 pub mod wasi;
 
 #[cfg(any(all(target_os = "wasi", target_env = "p2"), doc))]
@@ -125,6 +125,8 @@ pub mod windows;
 pub mod aix;
 #[cfg(target_os = "android")]
 pub mod android;
+#[cfg(target_os = "cygwin")]
+pub mod cygwin;
 #[cfg(target_os = "dragonfly")]
 pub mod dragonfly;
 #[cfg(target_os = "emscripten")]
@@ -183,5 +185,5 @@ pub mod xous;
 #[cfg(any(unix, target_os = "hermit", target_os = "trusty", target_os = "wasi", doc))]
 pub mod fd;
 
-#[cfg(any(target_os = "linux", target_os = "android", doc))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "cygwin", doc))]
 mod net;

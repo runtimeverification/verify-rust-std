@@ -1,6 +1,10 @@
+use safety::requires;
+
 use crate::iter::adapters::zip::try_get_unchecked;
 use crate::iter::adapters::{SourceIter, TrustedRandomAccess, TrustedRandomAccessNoCoerce};
 use crate::iter::{FusedIterator, InPlaceIterable, TrustedFused, TrustedLen};
+#[cfg(kani)]
+use crate::kani;
 use crate::num::NonZero;
 use crate::ops::Try;
 
@@ -23,6 +27,39 @@ impl<I> Enumerate<I> {
     pub(in crate::iter) fn new(iter: I) -> Enumerate<I> {
         Enumerate { iter, count: 0 }
     }
+
+    /// Retrieve the current position of the iterator.
+    ///
+    /// If the iterator has not advanced, the position returned will be 0.
+    ///
+    /// The position may also exceed the bounds of the iterator to allow for calculating
+    /// the displacement of the iterator from following calls to [`Iterator::next`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(next_index)]
+    ///
+    /// let arr = ['a', 'b'];
+    ///
+    /// let mut iter = arr.iter().enumerate();
+    ///
+    /// assert_eq!(iter.next_index(), 0);
+    /// assert_eq!(iter.next(), Some((0, &'a')));
+    ///
+    /// assert_eq!(iter.next_index(), 1);
+    /// assert_eq!(iter.next_index(), 1);
+    /// assert_eq!(iter.next(), Some((1, &'b')));
+    ///
+    /// assert_eq!(iter.next_index(), 2);
+    /// assert_eq!(iter.next(), None);
+    /// assert_eq!(iter.next_index(), 2);
+    /// ```
+    #[inline]
+    #[unstable(feature = "next_index", issue = "130711")]
+    pub fn next_index(&self) -> usize {
+        self.count
+    }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -36,7 +73,7 @@ where
     ///
     /// The method does no guarding against overflows, so enumerating more than
     /// `usize::MAX` elements either produces the wrong result or panics. If
-    /// debug assertions are enabled, a panic is guaranteed.
+    /// overflow checks are enabled, a panic is guaranteed.
     ///
     /// # Panics
     ///
@@ -127,6 +164,8 @@ where
 
     #[rustc_inherit_overflow_checks]
     #[inline]
+    #[requires(idx < self.iter.size_hint().0)]
+    #[cfg_attr(kani, kani::modifies(self))]
     unsafe fn __iterator_get_unchecked(&mut self, idx: usize) -> <Self as Iterator>::Item
     where
         Self: TrustedRandomAccessNoCoerce,

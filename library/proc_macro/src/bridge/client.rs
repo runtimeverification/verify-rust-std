@@ -26,18 +26,16 @@ macro_rules! define_client_handles {
         $(
             pub(crate) struct $oty {
                 handle: handle::Handle,
-                // Prevent Send and Sync impls. `!Send`/`!Sync` is the usual
-                // way of doing this, but that requires unstable features.
-                // rust-analyzer uses this code and avoids unstable features.
-                _marker: PhantomData<*mut ()>,
             }
+
+            impl !Send for $oty {}
+            impl !Sync for $oty {}
 
             // Forward `Drop::drop` to the inherent `drop` method.
             impl Drop for $oty {
                 fn drop(&mut self) {
                     $oty {
                         handle: self.handle,
-                        _marker: PhantomData,
                     }.drop();
                 }
             }
@@ -64,7 +62,6 @@ macro_rules! define_client_handles {
                 fn decode(r: &mut Reader<'_>, s: &mut S) -> Self {
                     $oty {
                         handle: handle::Handle::decode(r, s),
-                        _marker: PhantomData,
                     }
                 }
             }
@@ -74,11 +71,10 @@ macro_rules! define_client_handles {
             #[derive(Copy, Clone, PartialEq, Eq, Hash)]
             pub(crate) struct $ity {
                 handle: handle::Handle,
-                // Prevent Send and Sync impls. `!Send`/`!Sync` is the usual
-                // way of doing this, but that requires unstable features.
-                // rust-analyzer uses this code and avoids unstable features.
-                _marker: PhantomData<*mut ()>,
             }
+
+            impl !Send for $ity {}
+            impl !Sync for $ity {}
 
             impl<S> Encode<S> for $ity {
                 fn encode(self, w: &mut Writer, s: &mut S) {
@@ -90,7 +86,6 @@ macro_rules! define_client_handles {
                 fn decode(r: &mut Reader<'_>, s: &mut S) -> Self {
                     $ity {
                         handle: handle::Handle::decode(r, s),
-                        _marker: PhantomData,
                     }
                 }
             }
@@ -106,12 +101,6 @@ with_api_handle_types!(define_client_handles);
 // instead of pattern matching on methods, here and in server decl.
 
 impl Clone for TokenStream {
-    fn clone(&self) -> Self {
-        self.clone()
-    }
-}
-
-impl Clone for SourceFile {
     fn clone(&self) -> Self {
         self.clone()
     }
@@ -150,7 +139,7 @@ macro_rules! define_client_side {
 
                     buf.clear();
                     api_tags::Method::$name(api_tags::$name::$method).encode(&mut buf, &mut ());
-                    reverse_encode!(buf; $($arg),*);
+                    $($arg.encode(&mut buf, &mut ());)*
 
                     buf = bridge.dispatch.call(buf);
 

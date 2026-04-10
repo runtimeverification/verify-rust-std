@@ -4,7 +4,7 @@
 
 /// Inserts an element into a vector, returning the updated vector.
 ///
-/// `T` must be a vector with element type `U`.
+/// `T` must be a vector with element type `U`, and `idx` must be `const`.
 ///
 /// # Safety
 ///
@@ -15,14 +15,47 @@ pub const unsafe fn simd_insert<T, U>(x: T, idx: u32, val: U) -> T;
 
 /// Extracts an element from a vector.
 ///
+/// `T` must be a vector with element type `U`, and `idx` must be `const`.
+///
+/// # Safety
+///
+/// `idx` must be const and in-bounds of the vector.
+#[rustc_intrinsic]
+#[rustc_nounwind]
+pub const unsafe fn simd_extract<T, U>(x: T, idx: u32) -> U;
+
+/// Inserts an element into a vector, returning the updated vector.
+///
 /// `T` must be a vector with element type `U`.
+///
+/// If the index is `const`, [`simd_insert`] may emit better assembly.
 ///
 /// # Safety
 ///
 /// `idx` must be in-bounds of the vector.
-#[rustc_intrinsic]
 #[rustc_nounwind]
-pub const unsafe fn simd_extract<T, U>(x: T, idx: u32) -> U;
+#[rustc_intrinsic]
+pub unsafe fn simd_insert_dyn<T, U>(mut x: T, idx: u32, val: U) -> T {
+    // SAFETY: `idx` must be in-bounds
+    unsafe { (&raw mut x).cast::<U>().add(idx as usize).write(val) }
+    x
+}
+
+/// Extracts an element from a vector.
+///
+/// `T` must be a vector with element type `U`.
+///
+/// If the index is `const`, [`simd_extract`] may emit better assembly.
+///
+/// # Safety
+///
+/// `idx` must be in-bounds of the vector.
+#[rustc_nounwind]
+#[rustc_intrinsic]
+pub unsafe fn simd_extract_dyn<T, U>(x: T, idx: u32) -> U {
+    // SAFETY: `idx` must be in-bounds
+    unsafe { (&raw const x).cast::<U>().add(idx as usize).read() }
+}
 
 /// Adds two simd vectors elementwise.
 ///
@@ -93,7 +126,41 @@ pub unsafe fn simd_shl<T>(lhs: T, rhs: T) -> T;
 #[rustc_nounwind]
 pub unsafe fn simd_shr<T>(lhs: T, rhs: T) -> T;
 
-/// "Ands" vectors elementwise.
+/// Funnel Shifts vector left elementwise, with UB on overflow.
+///
+/// Concatenates `a` and `b` elementwise (with `a` in the most significant half),
+/// creating a vector of the same length, but with each element being twice as
+/// wide. Then shift this vector left elementwise by `shift`, shifting in zeros,
+/// and extract the most significant half of each of the elements. If `a` and `b`
+/// are the same, this is equivalent to an elementwise rotate left operation.
+///
+/// `T` must be a vector of integers.
+///
+/// # Safety
+///
+/// Each element of `shift` must be less than `<int>::BITS`.
+#[rustc_intrinsic]
+#[rustc_nounwind]
+pub unsafe fn simd_funnel_shl<T>(a: T, b: T, shift: T) -> T;
+
+/// Funnel Shifts vector right elementwise, with UB on overflow.
+///
+/// Concatenates `a` and `b` elementwise (with `a` in the most significant half),
+/// creating a vector of the same length, but with each element being twice as
+/// wide. Then shift this vector right elementwise by `shift`, shifting in zeros,
+/// and extract the least significant half of each of the elements. If `a` and `b`
+/// are the same, this is equivalent to an elementwise rotate right operation.
+///
+/// `T` must be a vector of integers.
+///
+/// # Safety
+///
+/// Each element of `shift` must be less than `<int>::BITS`.
+#[rustc_intrinsic]
+#[rustc_nounwind]
+pub unsafe fn simd_funnel_shr<T>(a: T, b: T, shift: T) -> T;
+
+/// "And"s vectors elementwise.
 ///
 /// `T` must be a vector of integers.
 #[rustc_intrinsic]
@@ -271,7 +338,7 @@ pub unsafe fn simd_shuffle<T, U, V>(x: T, y: T, idx: U) -> V;
 ///
 /// `U` must be a vector of pointers to the element type of `T`, with the same length as `T`.
 ///
-/// `V` must be a vector of signed integers with the same length as `T` (but any element size).
+/// `V` must be a vector of integers with the same length as `T` (but any element size).
 ///
 /// For each pointer in `ptr`, if the corresponding value in `mask` is `!0`, read the pointer.
 /// Otherwise if the corresponding value in `mask` is `0`, return the corresponding value from
@@ -292,7 +359,7 @@ pub unsafe fn simd_gather<T, U, V>(val: T, ptr: U, mask: V) -> T;
 ///
 /// `U` must be a vector of pointers to the element type of `T`, with the same length as `T`.
 ///
-/// `V` must be a vector of signed integers with the same length as `T` (but any element size).
+/// `V` must be a vector of integers with the same length as `T` (but any element size).
 ///
 /// For each pointer in `ptr`, if the corresponding value in `mask` is `!0`, write the
 /// corresponding value in `val` to the pointer.
@@ -316,7 +383,7 @@ pub unsafe fn simd_scatter<T, U, V>(val: T, ptr: U, mask: V);
 ///
 /// `U` must be a pointer to the element type of `T`
 ///
-/// `V` must be a vector of signed integers with the same length as `T` (but any element size).
+/// `V` must be a vector of integers with the same length as `T` (but any element size).
 ///
 /// For each element, if the corresponding value in `mask` is `!0`, read the corresponding
 /// pointer offset from `ptr`.
@@ -339,7 +406,7 @@ pub unsafe fn simd_masked_load<V, U, T>(mask: V, ptr: U, val: T) -> T;
 ///
 /// `U` must be a pointer to the element type of `T`
 ///
-/// `V` must be a vector of signed integers with the same length as `T` (but any element size).
+/// `V` must be a vector of integers with the same length as `T` (but any element size).
 ///
 /// For each element, if the corresponding value in `mask` is `!0`, write the corresponding
 /// value in `val` to the pointer offset from `ptr`.
@@ -455,7 +522,7 @@ pub unsafe fn simd_reduce_max<T, U>(x: T) -> U;
 #[rustc_nounwind]
 pub unsafe fn simd_reduce_min<T, U>(x: T) -> U;
 
-/// Logical "ands" all elements together.
+/// Logical "and"s all elements together.
 ///
 /// `T` must be a vector of integers or floats.
 ///
@@ -523,7 +590,7 @@ pub unsafe fn simd_bitmask<T, U>(x: T) -> U;
 ///
 /// `T` must be a vector.
 ///
-/// `M` must be a signed integer vector with the same length as `T` (but any element size).
+/// `M` must be an integer vector with the same length as `T` (but any element size).
 ///
 /// For each element, if the corresponding value in `mask` is `!0`, select the element from
 /// `if_true`.  If the corresponding value in `mask` is `0`, select the element from
@@ -544,11 +611,9 @@ pub unsafe fn simd_select<M, T>(mask: M, if_true: T, if_false: T) -> T;
 /// For each element, if the bit in `mask` is `1`, select the element from
 /// `if_true`.  If the corresponding bit in `mask` is `0`, select the element from
 /// `if_false`.
+/// The remaining bits of the mask are ignored.
 ///
 /// The bitmask bit order matches `simd_bitmask`.
-///
-/// # Safety
-/// Padding bits must be all zero.
 #[rustc_intrinsic]
 #[rustc_nounwind]
 pub unsafe fn simd_select_bitmask<M, T>(m: M, yes: T, no: T) -> T;
@@ -646,6 +711,14 @@ pub unsafe fn simd_floor<T>(x: T) -> T;
 #[rustc_intrinsic]
 #[rustc_nounwind]
 pub unsafe fn simd_round<T>(x: T) -> T;
+
+/// Rounds each element to the closest integer-valued float.
+/// Ties are resolved by rounding to the number with an even least significant digit
+///
+/// `T` must be a vector of floats.
+#[rustc_intrinsic]
+#[rustc_nounwind]
+pub unsafe fn simd_round_ties_even<T>(x: T) -> T;
 
 /// Returns the integer part of each element as an integer-valued float.
 /// In other words, non-integer values are truncated towards zero.

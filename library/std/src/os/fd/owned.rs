@@ -504,3 +504,51 @@ impl<'a> AsFd for io::StderrLock<'a> {
         unsafe { BorrowedFd::borrow_raw(2) }
     }
 }
+
+#[stable(feature = "anonymous_pipe", since = "1.87.0")]
+#[cfg(not(target_os = "trusty"))]
+impl AsFd for io::PipeReader {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_fd()
+    }
+}
+
+#[stable(feature = "anonymous_pipe", since = "1.87.0")]
+#[cfg(not(target_os = "trusty"))]
+impl From<io::PipeReader> for OwnedFd {
+    fn from(pipe: io::PipeReader) -> Self {
+        pipe.0.into_inner()
+    }
+}
+
+#[stable(feature = "anonymous_pipe", since = "1.87.0")]
+#[cfg(not(target_os = "trusty"))]
+impl AsFd for io::PipeWriter {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_fd()
+    }
+}
+
+#[stable(feature = "anonymous_pipe", since = "1.87.0")]
+#[cfg(not(target_os = "trusty"))]
+impl From<io::PipeWriter> for OwnedFd {
+    fn from(pipe: io::PipeWriter) -> Self {
+        pipe.0.into_inner()
+    }
+}
+
+#[stable(feature = "anonymous_pipe", since = "1.87.0")]
+#[cfg(not(target_os = "trusty"))]
+impl From<OwnedFd> for io::PipeReader {
+    fn from(owned_fd: OwnedFd) -> Self {
+        Self(FromInner::from_inner(owned_fd))
+    }
+}
+
+#[stable(feature = "anonymous_pipe", since = "1.87.0")]
+#[cfg(not(target_os = "trusty"))]
+impl From<OwnedFd> for io::PipeWriter {
+    fn from(owned_fd: OwnedFd) -> Self {
+        Self(FromInner::from_inner(owned_fd))
+    }
+}

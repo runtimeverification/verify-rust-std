@@ -78,16 +78,8 @@ macro_rules! with_api {
                     $self: $S::TokenStream
                 ) -> Vec<TokenTree<$S::TokenStream, $S::Span, $S::Symbol>>;
             },
-            SourceFile {
-                fn drop($self: $S::SourceFile);
-                fn clone($self: &$S::SourceFile) -> $S::SourceFile;
-                fn eq($self: &$S::SourceFile, other: &$S::SourceFile) -> bool;
-                fn path($self: &$S::SourceFile) -> String;
-                fn is_real($self: &$S::SourceFile) -> bool;
-            },
             Span {
                 fn debug($self: $S::Span) -> String;
-                fn source_file($self: $S::Span) -> $S::SourceFile;
                 fn parent($self: $S::Span) -> Option<$S::Span>;
                 fn source($self: $S::Span) -> $S::Span;
                 fn byte_range($self: $S::Span) -> Range<usize>;
@@ -95,6 +87,8 @@ macro_rules! with_api {
                 fn end($self: $S::Span) -> $S::Span;
                 fn line($self: $S::Span) -> usize;
                 fn column($self: $S::Span) -> usize;
+                fn file($self: $S::Span) -> String;
+                fn local_file($self: $S::Span) -> Option<String>;
                 fn join($self: $S::Span, other: $S::Span) -> Option<$S::Span>;
                 fn subspan($self: $S::Span, start: Bound<usize>, end: Bound<usize>) -> Option<$S::Span>;
                 fn resolved_at($self: $S::Span, at: $S::Span) -> $S::Span;
@@ -117,33 +111,12 @@ macro_rules! with_api_handle_types {
             'owned:
             FreeFunctions,
             TokenStream,
-            SourceFile,
 
             'interned:
             Span,
             // Symbol is handled manually
         }
     };
-}
-
-// FIXME(eddyb) this calls `encode` for each argument, but in reverse,
-// to match the ordering in `reverse_decode`.
-macro_rules! reverse_encode {
-    ($writer:ident;) => {};
-    ($writer:ident; $first:ident $(, $rest:ident)*) => {
-        reverse_encode!($writer; $($rest),*);
-        $first.encode(&mut $writer, &mut ());
-    }
-}
-
-// FIXME(eddyb) this calls `decode` for each argument, but in reverse,
-// to avoid borrow conflicts from borrows started by `&mut` arguments.
-macro_rules! reverse_decode {
-    ($reader:ident, $s:ident;) => {};
-    ($reader:ident, $s:ident; $first:ident: $first_ty:ty $(, $rest:ident: $rest_ty:ty)*) => {
-        reverse_decode!($reader, $s; $($rest: $rest_ty),*);
-        let $first = <$first_ty>::decode(&mut $reader, $s);
-    }
 }
 
 #[allow(unsafe_code)]
@@ -170,7 +143,7 @@ mod symbol;
 
 use buffer::Buffer;
 pub use rpc::PanicMessage;
-use rpc::{Decode, DecodeMut, Encode, Reader, Writer};
+use rpc::{DecodeMut, Encode, Reader, Writer};
 
 /// Configuration for establishing an active connection between a server and a
 /// client.  The server creates the bridge config (`run_server` in `server.rs`),
@@ -187,12 +160,10 @@ pub struct BridgeConfig<'a> {
 
     /// If 'true', always invoke the default panic hook
     force_show_panics: bool,
-
-    // Prevent Send and Sync impls. `!Send`/`!Sync` is the usual way of doing
-    // this, but that requires unstable features. rust-analyzer uses this code
-    // and avoids unstable features.
-    _marker: marker::PhantomData<*mut ()>,
 }
+
+impl !Send for BridgeConfig<'_> {}
+impl !Sync for BridgeConfig<'_> {}
 
 #[forbid(unsafe_code)]
 #[allow(non_camel_case_types)]

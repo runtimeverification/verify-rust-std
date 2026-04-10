@@ -96,17 +96,6 @@ impl Timespec {
         }
     }
 
-    // FIXME(#115199): Rust currently omits weak function definitions
-    // and its metadata from LLVM IR.
-    #[cfg_attr(
-        all(
-            target_os = "linux",
-            target_env = "gnu",
-            target_pointer_width = "32",
-            not(target_arch = "riscv32")
-        ),
-        no_sanitize(cfi)
-    )]
     pub fn now(clock: libc::clockid_t) -> Timespec {
         use crate::mem::MaybeUninit;
         use crate::sys::cvt;
@@ -123,7 +112,12 @@ impl Timespec {
 
             // __clock_gettime64 was added to 32-bit arches in glibc 2.34,
             // and it handles both vDSO calls and ENOSYS fallbacks itself.
-            weak!(fn __clock_gettime64(libc::clockid_t, *mut __timespec64) -> libc::c_int);
+            weak!(
+                fn __clock_gettime64(
+                    clockid: libc::clockid_t,
+                    tp: *mut __timespec64,
+                ) -> libc::c_int;
+            );
 
             if let Some(clock_gettime64) = __clock_gettime64.get() {
                 let mut t = MaybeUninit::uninit();
@@ -140,28 +134,25 @@ impl Timespec {
     }
 
     pub fn sub_timespec(&self, other: &Timespec) -> Result<Duration, Duration> {
+        // When a >= b, the difference fits in u64.
+        fn sub_ge_to_unsigned(a: i64, b: i64) -> u64 {
+            debug_assert!(a >= b);
+            a.wrapping_sub(b).cast_unsigned()
+        }
+
         if self >= other {
-            // NOTE(eddyb) two aspects of this `if`-`else` are required for LLVM
-            // to optimize it into a branchless form (see also #75545):
-            //
-            // 1. `self.tv_sec - other.tv_sec` shows up as a common expression
-            //    in both branches, i.e. the `else` must have its `- 1`
-            //    subtraction after the common one, not interleaved with it
-            //    (it used to be `self.tv_sec - 1 - other.tv_sec`)
-            //
-            // 2. the `Duration::new` call (or any other additional complexity)
-            //    is outside of the `if`-`else`, not duplicated in both branches
-            //
-            // Ideally this code could be rearranged such that it more
-            // directly expresses the lower-cost behavior we want from it.
             let (secs, nsec) = if self.tv_nsec.as_inner() >= other.tv_nsec.as_inner() {
                 (
-                    (self.tv_sec - other.tv_sec) as u64,
+                    sub_ge_to_unsigned(self.tv_sec, other.tv_sec),
                     self.tv_nsec.as_inner() - other.tv_nsec.as_inner(),
                 )
             } else {
+                // Following sequence of assertions explain why `self.tv_sec - 1` does not underflow.
+                debug_assert!(self.tv_nsec < other.tv_nsec);
+                debug_assert!(self.tv_sec > other.tv_sec);
+                debug_assert!(self.tv_sec > i64::MIN);
                 (
-                    (self.tv_sec - other.tv_sec - 1) as u64,
+                    sub_ge_to_unsigned(self.tv_sec - 1, other.tv_sec),
                     self.tv_nsec.as_inner() + (NSEC_PER_SEC as u32) - other.tv_nsec.as_inner(),
                 )
             };
@@ -267,6 +258,10 @@ pub struct Instant {
 }
 
 impl Instant {
+    #[cfg(target_vendor = "apple")]
+    pub(crate) const CLOCK_ID: libc::clockid_t = libc::CLOCK_UPTIME_RAW;
+    #[cfg(not(target_vendor = "apple"))]
+    pub(crate) const CLOCK_ID: libc::clockid_t = libc::CLOCK_MONOTONIC;
     pub fn now() -> Instant {
         // https://www.manpagez.com/man/3/clock_gettime/
         //
@@ -279,11 +274,7 @@ impl Instant {
         //
         // Instant on macos was historically implemented using mach_absolute_time;
         // we preserve this value domain out of an abundance of caution.
-        #[cfg(target_vendor = "apple")]
-        const clock_id: libc::clockid_t = libc::CLOCK_UPTIME_RAW;
-        #[cfg(not(target_vendor = "apple"))]
-        const clock_id: libc::clockid_t = libc::CLOCK_MONOTONIC;
-        Instant { t: Timespec::now(clock_id) }
+        Instant { t: Timespec::now(Self::CLOCK_ID) }
     }
 
     pub fn checked_sub_instant(&self, other: &Instant) -> Option<Duration> {
@@ -296,6 +287,14 @@ impl Instant {
 
     pub fn checked_sub_duration(&self, other: &Duration) -> Option<Instant> {
         Some(Instant { t: self.t.checked_sub_duration(other)? })
+    }
+
+    #[cfg_attr(
+        not(target_os = "linux"),
+        allow(unused, reason = "needed by the `sleep_until` on some unix platforms")
+    )]
+    pub(crate) fn into_timespec(self) -> Timespec {
+        self.t
     }
 }
 

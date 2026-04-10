@@ -1,5 +1,6 @@
 use core::mem::*;
-use core::ptr;
+use core::{array, ptr};
+use std::cell::Cell;
 #[cfg(panic = "unwind")]
 use std::rc::Rc;
 
@@ -327,11 +328,11 @@ fn uninit_write_clone_of_slice_no_drop() {
 }
 
 #[test]
-fn uninit_fill() {
+fn uninit_write_filled() {
     let mut dst = [MaybeUninit::new(255); 64];
     let expect = [0; 64];
 
-    assert_eq!(MaybeUninit::fill(&mut dst, 0), &expect);
+    assert_eq!(dst.write_filled(0), &expect);
 }
 
 #[cfg(panic = "unwind")]
@@ -352,7 +353,7 @@ impl Clone for CloneUntilPanic {
 
 #[test]
 #[cfg(panic = "unwind")]
-fn uninit_fill_clone_panic_drop() {
+fn uninit_write_filled_panic_drop() {
     use std::panic;
 
     let rc = Rc::new(());
@@ -361,7 +362,7 @@ fn uninit_fill_clone_panic_drop() {
 
     let src = CloneUntilPanic { limit: 3, rc: rc.clone() };
     let err = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        MaybeUninit::fill(&mut dst, src);
+        dst.write_filled(src);
     }));
 
     match err {
@@ -378,23 +379,23 @@ fn uninit_fill_clone_panic_drop() {
 
 #[test]
 #[cfg(panic = "unwind")]
-fn uninit_fill_clone_no_drop_clones() {
+fn uninit_write_filled_no_drop_clones() {
     let mut dst = [MaybeUninit::uninit(), MaybeUninit::uninit(), MaybeUninit::uninit()];
 
-    MaybeUninit::fill(&mut dst, Bomb);
+    dst.write_filled(Bomb);
 }
 
 #[test]
-fn uninit_fill_with() {
-    let mut dst = [MaybeUninit::new(255); 64];
-    let expect = [0; 64];
+fn uninit_write_with() {
+    let mut dst = [MaybeUninit::new(255usize); 64];
+    let expect = array::from_fn::<usize, 64, _>(|idx| idx);
 
-    assert_eq!(MaybeUninit::fill_with(&mut dst, || 0), &expect);
+    assert_eq!(dst.write_with(|idx| idx), &expect);
 }
 
 #[test]
 #[cfg(panic = "unwind")]
-fn uninit_fill_with_mid_panic() {
+fn uninit_write_with_mid_panic() {
     use std::panic;
 
     let rc = Rc::new(());
@@ -403,7 +404,7 @@ fn uninit_fill_with_mid_panic() {
 
     let src = CloneUntilPanic { limit: 3, rc: rc.clone() };
     let err = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        MaybeUninit::fill_with(&mut dst, || src.clone());
+        dst.write_with(|_| src.clone());
     }));
 
     drop(src);
@@ -423,58 +424,58 @@ fn uninit_fill_with_mid_panic() {
 
 #[test]
 #[cfg(panic = "unwind")]
-fn uninit_fill_with_no_drop() {
+fn uninit_write_with_no_drop() {
     let mut dst = [MaybeUninit::uninit()];
     let src = Bomb;
 
-    MaybeUninit::fill_with(&mut dst, || src.clone());
+    dst.write_with(|_| src.clone());
 
     forget(src);
 }
 
 #[test]
-fn uninit_fill_from() {
+fn uninit_write_iter() {
     let mut dst = [MaybeUninit::new(255); 64];
     let src = [0; 64];
 
-    let (initted, remainder) = MaybeUninit::fill_from(&mut dst, src.into_iter());
+    let (initted, remainder) = dst.write_iter(src.into_iter());
     assert_eq!(initted, &src);
     assert_eq!(remainder.len(), 0);
 }
 
 #[test]
-fn uninit_fill_from_partial() {
+fn uninit_write_iter_partial() {
     let mut dst = [MaybeUninit::new(255); 64];
     let src = [0; 48];
 
-    let (initted, remainder) = MaybeUninit::fill_from(&mut dst, src.into_iter());
+    let (initted, remainder) = dst.write_iter(src.into_iter());
     assert_eq!(initted, &src);
     assert_eq!(remainder.len(), 16);
 }
 
 #[test]
-fn uninit_over_fill() {
+fn uninit_write_iter_overfill() {
     let mut dst = [MaybeUninit::new(255); 64];
     let src = [0; 72];
 
-    let (initted, remainder) = MaybeUninit::fill_from(&mut dst, src.into_iter());
+    let (initted, remainder) = dst.write_iter(src.into_iter());
     assert_eq!(initted, &src[0..64]);
     assert_eq!(remainder.len(), 0);
 }
 
 #[test]
-fn uninit_empty_fill() {
+fn uninit_write_iter_empty() {
     let mut dst = [MaybeUninit::new(255); 64];
     let src = [0; 0];
 
-    let (initted, remainder) = MaybeUninit::fill_from(&mut dst, src.into_iter());
+    let (initted, remainder) = dst.write_iter(src.into_iter());
     assert_eq!(initted, &src[0..0]);
     assert_eq!(remainder.len(), 64);
 }
 
 #[test]
 #[cfg(panic = "unwind")]
-fn uninit_fill_from_mid_panic() {
+fn uninit_write_iter_mid_panic() {
     use std::panic;
 
     struct IterUntilPanic {
@@ -504,7 +505,7 @@ fn uninit_fill_from_mid_panic() {
     let src = IterUntilPanic { limit: 3, rc: rc.clone() };
 
     let err = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        MaybeUninit::fill_from(&mut dst, src);
+        dst.write_iter(src);
     }));
 
     match err {
@@ -522,11 +523,11 @@ fn uninit_fill_from_mid_panic() {
 
 #[test]
 #[cfg(panic = "unwind")]
-fn uninit_fill_from_no_drop() {
+fn uninit_write_iter_no_drop() {
     let mut dst = [MaybeUninit::uninit()];
     let src = [Bomb];
 
-    MaybeUninit::fill_from(&mut dst, src.iter());
+    dst.write_iter(src.iter());
 
     forget(src);
 }
@@ -794,4 +795,49 @@ fn const_maybe_uninit_zeroed() {
     const SIZE: usize = size_of::<Foo>();
 
     assert_eq!(unsafe { (*UNINIT.0.cast::<[[u8; SIZE]; 1]>())[0] }, [0u8; SIZE]);
+}
+
+#[test]
+fn drop_guards_only_dropped_by_closure_when_run() {
+    let value_drops = Cell::new(0);
+    let value = DropGuard::new((), |()| value_drops.set(1 + value_drops.get()));
+    let closure_drops = Cell::new(0);
+    let guard = DropGuard::new(value, |_| closure_drops.set(1 + closure_drops.get()));
+    assert_eq!(value_drops.get(), 0);
+    assert_eq!(closure_drops.get(), 0);
+    drop(guard);
+    assert_eq!(value_drops.get(), 1);
+    assert_eq!(closure_drops.get(), 1);
+}
+
+#[test]
+fn drop_guard_into_inner() {
+    let dropped = Cell::new(false);
+    let value = DropGuard::new(42, |_| dropped.set(true));
+    let guard = DropGuard::new(value, |_| dropped.set(true));
+    let inner = DropGuard::into_inner(guard);
+    assert_eq!(dropped.get(), false);
+    assert_eq!(*inner, 42);
+}
+
+#[test]
+#[cfg(panic = "unwind")]
+fn drop_guard_always_drops_value_if_closure_drop_unwinds() {
+    // Create a value with a destructor, which we will validate ran successfully.
+    let mut value_was_dropped = false;
+    let value_with_tracked_destruction = DropGuard::new((), |_| value_was_dropped = true);
+
+    // Create a closure that will begin unwinding when dropped.
+    let drop_bomb = DropGuard::new((), |_| panic!());
+    let closure_that_panics_on_drop = move |_| {
+        let _drop_bomb = drop_bomb;
+    };
+
+    // This will run the closure, which will panic when dropped. This should
+    // run the destructor of the value we passed, which we validate.
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let guard = DropGuard::new(value_with_tracked_destruction, closure_that_panics_on_drop);
+        DropGuard::into_inner(guard);
+    }));
+    assert!(value_was_dropped);
 }
